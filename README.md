@@ -1,36 +1,55 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# MOSSA OTTO — Music Library
 
-## Getting Started
+A shared track library for the DJ duo MOSSA OTTO. Both DJs paste URLs from YouTube, Spotify, or SoundCloud, tag each track (genre, intensity, BPM, key, set position, score, notes), and see each other's additions in real time. The app never plays audio — its job is capture → tag → shared library → Soulseek export queue. When prepping a download session, filter to the queue, copy the Soulseek search list (one `Artist - Title` per line), download in high quality, then mark tracks as downloaded.
 
-First, run the development server:
+## Setup
+
+### 1. Create a Supabase project
+
+Go to [supabase.com](https://supabase.com), create a new project, then open the **SQL Editor** and paste the entire contents of `supabase/schema.sql`. Run it. This creates the `tracks` table, indexes, RLS policies, and enables realtime.
+
+### 2. Configure environment variables
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+cp .env.local.example .env.local
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Fill in `.env.local` with your project's values from **Supabase → Project Settings → API**:
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```
+NEXT_PUBLIC_SUPABASE_URL=https://your-project-ref.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+### 3. Add users
 
-## Learn More
+In the Supabase dashboard go to **Authentication → Users → Invite user**. Magic-link email auth is used — no passwords. Signup can also be enabled for self-service.
 
-To learn more about Next.js, take a look at the following resources:
+## Local dev
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```bash
+npm install
+npm run dev
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Open http://localhost:3000. You'll be redirected to `/auth/login` — enter your email to receive a magic link.
 
-## Deploy on Vercel
+## Deploy to Vercel
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+1. Push this repo to GitHub.
+2. Go to [vercel.com/new](https://vercel.com/new), import the repo.
+3. In **Environment Variables**, add:
+   - `NEXT_PUBLIC_SUPABASE_URL`
+   - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+4. Deploy.
+5. In **Supabase → Authentication → URL Configuration**, add your Vercel production URL (e.g. `https://mossa-otto.vercel.app`) and any preview URLs to **Redirect URLs** so magic links work outside localhost.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Troubleshooting
+
+| Symptom | Fix |
+|---|---|
+| `Invalid URL path` error on startup | Check `NEXT_PUBLIC_SUPABASE_URL` — it must be `https://xxx.supabase.co` with no trailing slash |
+| Magic link not arriving | Check spam folder; free Supabase projects have an SMTP rate limit of 4 emails/hour — use a custom SMTP in project settings for production |
+| Realtime not updating | Re-run the `alter publication supabase_realtime add table tracks` line from `schema.sql` in the SQL Editor |
+| Auth callback fails in production | Confirm the production URL is added to Redirect URLs in Supabase Auth settings |
+| 403 errors on DB operations | RLS policies require an authenticated session — make sure you're signed in |
