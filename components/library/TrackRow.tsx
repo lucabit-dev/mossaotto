@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { createClient } from '@/lib/supabase/client';
 import type { Track } from '@/lib/types';
 import { PositionDots, IntensityBars, ScorePips } from '@/components/primitives';
 
@@ -9,6 +8,8 @@ interface TrackRowProps {
   track: Track;
   onClick: () => void;
   onToast: (msg: string, type?: 'ok' | 'err') => void;
+  selected: boolean;
+  onSelect: (id: string, selected: boolean) => void;
 }
 
 const SRC_LABEL: Record<string, string> = {
@@ -32,7 +33,7 @@ const SOURCE_CODE: Record<string, string> = {
   bandcamp: 'bc',
 };
 
-const GRID = '28px 48px 1fr 96px 120px 110px 110px 36px';
+const GRID = '28px 48px 1fr 90px 120px 110px 110px 36px';
 
 export function TrackRowHeaders() {
   return (
@@ -44,6 +45,7 @@ export function TrackRowHeaders() {
         gap: 14,
         height: 34,
         padding: '0 16px',
+        borderTop: '1px solid var(--mo-hairline)',
       }}
     >
       <span className="mo-eyebrow" />
@@ -58,19 +60,15 @@ export function TrackRowHeaders() {
   );
 }
 
-export function TrackRow({ track, onClick, onToast }: TrackRowProps) {
-  const supabase = createClient();
+export function TrackRow({ track, onClick, selected, onSelect }: TrackRowProps) {
   const [hovered, setHovered] = useState(false);
   const [justArrived, setJustArrived] = useState(false);
 
-  // Optimistic downloaded state — updates immediately, then syncs from realtime
-  const [downloaded, setDownloaded] = useState(track.downloaded);
-  const prevTrackDownloaded = useRef(track.downloaded);
+  // Reflect downloaded from track prop
+  const downloaded = track.downloaded;
+  const prevDownloaded = useRef(track.downloaded);
   useEffect(() => {
-    if (prevTrackDownloaded.current !== track.downloaded) {
-      prevTrackDownloaded.current = track.downloaded;
-      setDownloaded(track.downloaded);
-    }
+    prevDownloaded.current = track.downloaded;
   }, [track.downloaded]);
 
   useEffect(() => {
@@ -82,29 +80,24 @@ export function TrackRow({ track, onClick, onToast }: TrackRowProps) {
     }
   }, [track.created_at]);
 
-  async function toggleDownloaded(e: React.MouseEvent) {
-    e.stopPropagation();
-    const next = !downloaded;
-    setDownloaded(next); // optimistic
-    const { error } = await supabase
-      .from('tracks')
-      .update({ downloaded: next })
-      .eq('id', track.id);
-    if (error) {
-      setDownloaded(!next); // revert
-      onToast(error.message, 'err');
-    }
-  }
-
   const srcCode = SOURCE_CODE[track.source] ?? 'yt';
-  const dim = downloaded ? 0.6 : 1;
+  const dim = downloaded ? 0.7 : 1;
   const position = track.set_position[0] ?? null;
 
   const rowBg = justArrived
     ? 'var(--mo-accent-tint)'
+    : selected
+    ? 'var(--mo-accent-tint)'
     : hovered
     ? 'var(--mo-bg-hover)'
     : 'transparent';
+
+  const metaParts = [
+    track.artist,
+    track.genre,
+    track.bpm ? `${track.bpm} BPM` : null,
+    track.musical_key,
+  ].filter(Boolean) as string[];
 
   return (
     <div
@@ -124,6 +117,7 @@ export function TrackRow({ track, onClick, onToast }: TrackRowProps) {
         transition: 'background .15s',
         position: 'relative',
         animation: justArrived ? 'mo-enter 0.3s cubic-bezier(.2,.8,.4,1)' : undefined,
+        boxShadow: selected ? 'inset 0 0 0 1px var(--mo-accent-ring)' : undefined,
       }}
     >
       {/* Accent rail when freshly added */}
@@ -142,43 +136,42 @@ export function TrackRow({ track, onClick, onToast }: TrackRowProps) {
         />
       )}
 
-      {/* Col 1: Status circle (download toggle) */}
+      {/* Col 1: Checkbox */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <button
-          onClick={toggleDownloaded}
-          title={downloaded ? 'Mark as not downloaded' : 'Mark as downloaded'}
-          style={{
-            width: 18,
-            height: 18,
-            borderRadius: '50%',
-            background: 'transparent',
-            border: 'none',
-            cursor: 'pointer',
-            padding: 0,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            boxShadow: downloaded
-              ? 'inset 0 0 0 1px var(--mo-success)'
-              : 'inset 0 0 0 1px var(--mo-hairline-strong)',
-            flexShrink: 0,
-            transition: 'box-shadow 0.2s',
-          }}
+        <label
+          onClick={e => e.stopPropagation()}
+          style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
         >
-          {downloaded && (
-            <svg
-              width="10"
-              height="10"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="var(--mo-success)"
-              strokeWidth="2.5"
-              style={{ animation: 'mo-pop 0.22s cubic-bezier(.2,.8,.4,1)' }}
-            >
-              <polyline points="20 6 9 17 4 12" />
-            </svg>
-          )}
-        </button>
+          <input
+            type="checkbox"
+            checked={selected}
+            onChange={e => onSelect(track.id, e.target.checked)}
+            onClick={e => e.stopPropagation()}
+            style={{ position: 'absolute', opacity: 0, width: 0, height: 0, pointerEvents: 'none' }}
+          />
+          <div
+            style={{
+              width: 24,
+              height: 24,
+              borderRadius: 6,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              flexShrink: 0,
+              background: selected ? 'var(--mo-accent-tint)' : 'transparent',
+              boxShadow: selected
+                ? 'inset 0 0 0 1px var(--mo-accent)'
+                : 'inset 0 0 0 1px var(--mo-hairline-strong)',
+              transition: 'all .12s',
+            }}
+          >
+            {selected && (
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--mo-accent)" strokeWidth="2.5">
+                <polyline points="20 6 9 17 4 12" />
+              </svg>
+            )}
+          </div>
+        </label>
       </div>
 
       {/* Col 2: Source tile */}
@@ -224,7 +217,7 @@ export function TrackRow({ track, onClick, onToast }: TrackRowProps) {
         </div>
       </div>
 
-      {/* Col 3: Track — title + subtitle with BPM/key inline */}
+      {/* Col 3: Track — title + subtitle */}
       <div style={{ minWidth: 0, opacity: dim, transition: 'opacity 0.25s' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 2 }}>
           <span
@@ -280,34 +273,12 @@ export function TrackRow({ track, onClick, onToast }: TrackRowProps) {
           style={{
             fontSize: 12,
             color: 'var(--mo-text-2)',
-            display: 'flex',
-            alignItems: 'center',
-            gap: 5,
             whiteSpace: 'nowrap',
             overflow: 'hidden',
             textOverflow: 'ellipsis',
           }}
         >
-          {track.artist && (
-            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{track.artist}</span>
-          )}
-          {track.artist && track.genre && <span style={{ color: 'var(--mo-text-3)' }}>·</span>}
-          {track.genre && <span style={{ color: 'var(--mo-text-3)' }}>{track.genre}</span>}
-          {(track.bpm || track.musical_key) && (
-            <>
-              <span style={{ color: 'var(--mo-text-3)' }}>·</span>
-              <span
-                style={{
-                  fontFamily: 'var(--mo-font-mono)',
-                  fontSize: 11,
-                  color: 'var(--mo-text-3)',
-                  letterSpacing: 0,
-                }}
-              >
-                {[track.bpm && `${track.bpm}`, track.musical_key].filter(Boolean).join(' · ')}
-              </span>
-            </>
-          )}
+          {metaParts.join(' · ')}
         </div>
       </div>
 

@@ -1,5 +1,6 @@
 'use client';
 
+import { useState, useEffect, useRef } from 'react';
 import type { FilterState, SetPosition, SortKey } from '@/lib/types';
 
 interface FilterBarProps {
@@ -76,7 +77,20 @@ function Segmented<T extends string>({
   );
 }
 
-export function FilterBar({ filters, onChange, shown: _shown, total, queue }: FilterBarProps) {
+export function FilterBar({ filters, onChange, genreOptions, shown: _shown, total, queue }: FilterBarProps) {
+  const [showMore, setShowMore] = useState(false);
+  const moreRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handler(e: MouseEvent) {
+      if (moreRef.current && !moreRef.current.contains(e.target as Node)) {
+        setShowMore(false);
+      }
+    }
+    if (showMore) document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [showMore]);
+
   const isDefault =
     filters.status === 'all' &&
     filters.source === 'all' &&
@@ -196,49 +210,132 @@ export function FilterBar({ filters, onChange, shown: _shown, total, queue }: Fi
 
       <div style={{ flex: 1 }} />
 
-      {/* "More filters" button — shows badge when advanced filters are active */}
-      <button
-        onClick={() => {}}
-        style={{
-          height: 28,
-          padding: '0 12px',
-          borderRadius: 999,
-          border: 'none',
-          cursor: 'pointer',
-          background: 'transparent',
-          color: 'var(--mo-text-2)',
-          fontWeight: 500,
-          fontSize: 13,
-          fontFamily: 'var(--mo-font-text)',
-          display: 'inline-flex',
-          alignItems: 'center',
-          gap: 6,
-        }}
-      >
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-          <path d="M4 6h16M7 12h10M10 18h4" />
-        </svg>
-        More filters
-        {advancedCount > 0 && (
-          <span
-            style={{
-              minWidth: 18,
-              height: 18,
-              padding: '0 5px',
-              borderRadius: 999,
-              background: 'var(--mo-accent)',
-              color: '#fff',
-              fontSize: 11,
-              fontWeight: 700,
-              display: 'inline-flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
-          >
-            {advancedCount}
-          </span>
+      {/* "More filters" button with popover */}
+      <div ref={moreRef} style={{ position: 'relative' }}>
+        <button
+          onClick={() => setShowMore(p => !p)}
+          style={{
+            height: 28,
+            padding: '0 12px',
+            borderRadius: 999,
+            border: 'none',
+            cursor: 'pointer',
+            background: advancedCount > 0 ? 'var(--mo-accent-tint)' : 'transparent',
+            color: advancedCount > 0 ? 'var(--mo-accent)' : 'var(--mo-text-2)',
+            boxShadow: advancedCount > 0 ? 'inset 0 0 0 1px var(--mo-accent-ring)' : 'none',
+            fontWeight: 500,
+            fontSize: 13,
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 6,
+          }}
+        >
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+            <path d="M4 6h16M7 12h10M10 18h4" />
+          </svg>
+          More filters
+          {advancedCount > 0 && (
+            <span style={{
+              minWidth: 18, height: 18, padding: '0 5px', borderRadius: 999,
+              background: 'var(--mo-accent)', color: '#fff',
+              fontSize: 11, fontWeight: 700,
+              display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+            }}>
+              {advancedCount}
+            </span>
+          )}
+        </button>
+
+        {/* Popover */}
+        {showMore && (
+          <div style={{
+            position: 'absolute',
+            top: 'calc(100% + 8px)',
+            right: 0,
+            zIndex: 200,
+            background: 'var(--mo-bg-elev)',
+            borderRadius: 14,
+            boxShadow: 'var(--mo-shadow-2), inset 0 0 0 1px var(--mo-hairline-strong)',
+            padding: 16,
+            minWidth: 280,
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 16,
+          }}>
+            {/* Intensity ≥ */}
+            <div>
+              <div style={{ marginBottom: 8 }}>
+                <span className="mo-eyebrow">Intensity ≥</span>
+              </div>
+              <div style={{ display: 'flex', gap: 6 }}>
+                {([null, 1, 2, 3, 4, 5] as (number | null)[]).map(v => {
+                  const active = filters.minIntensity === v;
+                  return (
+                    <button key={String(v)} onClick={() => onChange({ minIntensity: v })}
+                      style={{
+                        flex: 1, height: 32, borderRadius: 8, border: 'none', cursor: 'pointer',
+                        background: active ? 'var(--mo-accent-tint)' : 'var(--mo-bg-sunken)',
+                        color: active ? 'var(--mo-accent)' : 'var(--mo-text-2)',
+                        boxShadow: active ? 'inset 0 0 0 1px var(--mo-accent-ring)' : 'inset 0 0 0 1px var(--mo-hairline-strong)',
+                        fontSize: 12.5, fontWeight: active ? 700 : 500,
+                        transition: 'all .12s',
+                      }}>
+                      {v === null ? 'Any' : v}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Score ≥ */}
+            <div>
+              <div style={{ marginBottom: 8 }}>
+                <span className="mo-eyebrow">Score ≥</span>
+              </div>
+              <div style={{ display: 'flex', gap: 6 }}>
+                {([null, 1, 2, 3, 4, 5] as (number | null)[]).map(v => {
+                  const active = filters.minScore === v;
+                  return (
+                    <button key={String(v)} onClick={() => onChange({ minScore: v })}
+                      style={{
+                        flex: 1, height: 32, borderRadius: 8, border: 'none', cursor: 'pointer',
+                        background: active ? 'var(--mo-accent-tint)' : 'var(--mo-bg-sunken)',
+                        color: active ? 'var(--mo-accent)' : 'var(--mo-text-2)',
+                        boxShadow: active ? 'inset 0 0 0 1px var(--mo-accent-ring)' : 'inset 0 0 0 1px var(--mo-hairline-strong)',
+                        fontSize: 12.5, fontWeight: active ? 700 : 500,
+                        transition: 'all .12s',
+                      }}>
+                      {v === null ? 'Any' : v}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Genre */}
+            <div>
+              <div style={{ marginBottom: 8 }}>
+                <span className="mo-eyebrow">Genre</span>
+              </div>
+              <input
+                value={filters.genre}
+                onChange={e => onChange({ genre: e.target.value })}
+                placeholder="e.g. Techno"
+                list="filterbar-genre-list"
+                style={{
+                  width: '100%', height: 34, padding: '0 12px',
+                  borderRadius: 8, background: 'var(--mo-bg-sunken)', border: 'none', outline: 'none',
+                  boxShadow: 'inset 0 0 0 1px var(--mo-hairline-strong)',
+                  fontSize: 13, color: 'var(--mo-text-1)', boxSizing: 'border-box' as const,
+                }}
+              />
+              <datalist id="filterbar-genre-list">
+                {genreOptions.map(g => <option key={g} value={g} />)}
+              </datalist>
+            </div>
+          </div>
         )}
-      </button>
+      </div>
 
       {/* Sort */}
       <div style={{ position: 'relative', flexShrink: 0 }}>
