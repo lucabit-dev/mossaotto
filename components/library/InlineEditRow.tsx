@@ -3,10 +3,56 @@
 import { useState, useEffect, useRef } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import type { Track, SetPosition } from '@/lib/types';
-import { ScorePips, IntensityBars, PositionDots } from '@/components/primitives';
+import { ScorePips, IntensityBars } from '@/components/primitives';
 import { bpmLookup } from '@/lib/lookup';
 
 type IntensityScore = 1 | 2 | 3 | 4 | 5;
+
+function StepperGrid<T extends number>({
+  value,
+  onChange,
+  renderCell,
+}: {
+  value: T | null;
+  onChange: (v: T | null) => void;
+  renderCell: (n: T) => React.ReactNode;
+}) {
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 6 }}>
+      {([1, 2, 3, 4, 5] as T[]).map(n => {
+        const on = n === value;
+        return (
+          <button
+            key={n}
+            type="button"
+            onClick={() => onChange(on ? null : n)}
+            style={{
+              height: 40,
+              borderRadius: 8,
+              border: 'none',
+              cursor: 'pointer',
+              background: on ? 'var(--mo-accent-tint-strong, var(--mo-accent-tint))' : 'var(--mo-bg-elev)',
+              boxShadow: on
+                ? 'inset 0 0 0 1px var(--mo-accent-ring)'
+                : 'inset 0 0 0 1px var(--mo-hairline-strong)',
+              color: on ? 'var(--mo-accent)' : 'var(--mo-text-2)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              flexDirection: 'column',
+              gap: 4,
+              fontSize: 12,
+              fontWeight: on ? 700 : 500,
+              transition: 'all .12s',
+            }}
+          >
+            {renderCell(n)}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
 
 interface InlineEditRowProps {
   track: Partial<Track>;
@@ -17,7 +63,6 @@ interface InlineEditRowProps {
 }
 
 const SET_POSITIONS: SetPosition[] = ['open', 'middle', 'close'];
-const RATINGS: IntensityScore[] = [1, 2, 3, 4, 5];
 
 const SOURCE_CODE: Record<string, string> = {
   youtube: 'yt',
@@ -47,92 +92,6 @@ function FieldLabel({ children, hint }: { children: React.ReactNode; hint?: stri
           {hint}
         </kbd>
       )}
-    </div>
-  );
-}
-
-function RatingPicker({
-  label,
-  hint,
-  value,
-  onChange,
-  Visual,
-}: {
-  label: string;
-  hint?: string;
-  value: IntensityScore | null;
-  onChange: (v: IntensityScore | null) => void;
-  Visual: typeof IntensityBars | typeof ScorePips;
-}) {
-  return (
-    <div>
-      <FieldLabel hint={hint}>{label}</FieldLabel>
-      <div
-        style={{
-          display: 'inline-flex',
-          alignItems: 'center',
-          gap: 10,
-          padding: '5px 6px 5px 12px',
-          borderRadius: 12,
-          background: 'var(--mo-bg-sunken)',
-          boxShadow: 'inset 0 0 0 1px var(--mo-hairline)',
-        }}
-      >
-        <span
-          style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            width: 52,
-            flexShrink: 0,
-          }}
-          aria-hidden
-        >
-          <Visual value={value ?? 0} size="md" />
-        </span>
-        <span
-          style={{ width: 1, height: 22, background: 'var(--mo-hairline-strong)', flexShrink: 0 }}
-        />
-        <div style={{ display: 'inline-flex', gap: 2, padding: 2 }}>
-          {RATINGS.map(v => {
-            const filled = value !== null && v <= value;
-            const selected = value === v;
-            return (
-              <button
-                key={v}
-                type="button"
-                aria-label={`${label} ${v}`}
-                aria-pressed={selected}
-                onClick={() => onChange(selected ? null : v)}
-                style={{
-                  width: 34,
-                  height: 34,
-                  borderRadius: 8,
-                  border: 'none',
-                  cursor: 'pointer',
-                  background: selected
-                    ? 'var(--mo-bg-elev)'
-                    : filled
-                    ? 'var(--mo-accent-tint)'
-                    : 'transparent',
-                  boxShadow: selected
-                    ? '0 1px 2px rgba(0,0,0,.06), 0 0 0 1px var(--mo-accent-ring)'
-                    : 'none',
-                  color: selected || filled ? 'var(--mo-accent)' : 'var(--mo-text-3)',
-                  fontSize: 13,
-                  fontWeight: selected ? 700 : 500,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  transition: 'all .12s',
-                }}
-              >
-                {v}
-              </button>
-            );
-          })}
-        </div>
-      </div>
     </div>
   );
 }
@@ -208,7 +167,10 @@ export function InlineEditRow({ track, genreOptions, userEmail, onClose, onToast
   const [notes, setNotes] = useState(track.notes ?? '');
   const [saving, setSaving] = useState(false);
   const [bpmLoading, setBpmLoading] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const bpmUserEdited = useRef(false);
+  const showDeleteConfirmRef = useRef(false);
+  useEffect(() => { showDeleteConfirmRef.current = showDeleteConfirm; }, [showDeleteConfirm]);
 
   useEffect(() => {
     titleRef.current?.focus();
@@ -220,7 +182,11 @@ export function InlineEditRow({ track, genreOptions, userEmail, onClose, onToast
       const isInput = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT';
 
       if (e.key === 'Escape') {
-        onClose();
+        if (showDeleteConfirmRef.current) {
+          setShowDeleteConfirm(false);
+        } else {
+          onClose();
+        }
         return;
       }
       if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
@@ -298,9 +264,14 @@ export function InlineEditRow({ track, genreOptions, userEmail, onClose, onToast
     }
   }
 
-  async function handleDelete() {
+  function handleDelete() {
     if (!track.id) return;
-    if (!confirm('Delete this track?')) return;
+    setShowDeleteConfirm(true);
+  }
+
+  async function doDelete() {
+    if (!track.id) return;
+    setShowDeleteConfirm(false);
     const { error } = await supabase.from('tracks').delete().eq('id', track.id);
     if (error) onToast(error.message, 'err');
     else { onToast('Track deleted'); onClose(); }
@@ -539,11 +510,22 @@ export function InlineEditRow({ track, genreOptions, userEmail, onClose, onToast
         </div>
       </div>
 
-      {/* Fields row 2 */}
-      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 16, flexWrap: 'wrap' }}>
+      {/* Scoring section — separated by dashed divider */}
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: '1fr 1fr 1fr',
+          gap: 20,
+          paddingTop: 16,
+          borderTop: '1px dashed var(--mo-hairline-strong)',
+        }}
+      >
         {/* Set position */}
         <div>
-          <FieldLabel>Set position</FieldLabel>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
+            <span className="mo-eyebrow">Set position</span>
+            <span style={{ fontSize: 10, color: 'var(--mo-text-3)', fontFamily: 'var(--mo-font-mono)' }}>O M C</span>
+          </div>
           <div
             style={{
               display: 'inline-flex',
@@ -555,29 +537,46 @@ export function InlineEditRow({ track, genreOptions, userEmail, onClose, onToast
           >
             {SET_POSITIONS.map(pos => {
               const active = setPosition === pos;
+              const idx = ({ open: 0, middle: 1, close: 2 } as Record<string, number>)[pos];
               return (
                 <button
                   key={pos}
                   onClick={() => setSetPosition(prev => prev === pos ? null : pos)}
                   style={{
-                    height: 32,
-                    padding: '0 14px',
+                    height: 34,
+                    padding: '0 12px',
                     borderRadius: 999,
                     border: 'none',
                     cursor: 'pointer',
                     background: active ? 'var(--mo-bg-elev)' : 'transparent',
-                    boxShadow: active ? '0 1px 2px rgba(0,0,0,.06), 0 0 0 1px var(--mo-hairline-strong)' : 'none',
+                    boxShadow: active
+                      ? '0 1px 2px rgba(0,0,0,.06), 0 0 0 1px var(--mo-hairline-strong)'
+                      : 'none',
                     color: active ? 'var(--mo-text-1)' : 'var(--mo-text-2)',
                     fontWeight: 600,
                     fontSize: 13,
+                    fontFamily: 'var(--mo-font-text)',
                     display: 'flex',
                     alignItems: 'center',
-                    gap: 7,
+                    gap: 6,
                     transition: 'all .12s',
                     textTransform: 'capitalize',
                   }}
                 >
-                  <PositionDots value={pos} size={5} />
+                  <span style={{ display: 'inline-flex', gap: 3 }}>
+                    {[0, 1, 2].map(i => (
+                      <span
+                        key={i}
+                        style={{
+                          width: 5,
+                          height: 5,
+                          borderRadius: '50%',
+                          background: i === idx ? (active ? 'var(--mo-accent)' : 'var(--mo-text-2)') : 'transparent',
+                          boxShadow: i !== idx ? 'inset 0 0 0 1px var(--mo-hairline-strong)' : 'none',
+                        }}
+                      />
+                    ))}
+                  </span>
                   {pos}
                 </button>
               );
@@ -585,50 +584,69 @@ export function InlineEditRow({ track, genreOptions, userEmail, onClose, onToast
           </div>
         </div>
 
-        <span style={{ width: 1, height: 40, background: 'var(--mo-hairline-strong)', flexShrink: 0, alignSelf: 'center' }} />
-
-        <RatingPicker
-          label="Intensity"
-          hint="1–5"
-          value={intensity}
-          onChange={setIntensity}
-          Visual={IntensityBars}
-        />
-
-        <RatingPicker
-          label="Score"
-          hint="⇧1–5"
-          value={score}
-          onChange={setScore}
-          Visual={ScorePips}
-        />
-
-        {isEdit && (
-          <div style={{ flex: 1, minWidth: 180 }}>
-            <FieldLabel>Notes</FieldLabel>
-            <textarea
-              value={notes}
-              onChange={e => setNotes(e.target.value)}
-              rows={2}
-              placeholder="Optional notes…"
-              style={{
-                width: '100%',
-                padding: '8px 12px',
-                borderRadius: 10,
-                background: 'var(--mo-bg-elev)',
-                border: 'none',
-                outline: 'none',
-                boxShadow: 'inset 0 0 0 1px var(--mo-hairline-strong)',
-                fontSize: 13.5,
-                color: 'var(--mo-text-1)',
-                resize: 'none',
-                fontFamily: 'var(--mo-font-text)',
-                boxSizing: 'border-box',
-              }}
-            />
+        {/* Intensity */}
+        <div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
+            <span className="mo-eyebrow">Intensity</span>
+            <span style={{ fontSize: 10, color: 'var(--mo-text-3)', fontFamily: 'var(--mo-font-mono)' }}>1–5</span>
           </div>
-        )}
+          <StepperGrid
+            value={intensity}
+            onChange={setIntensity}
+            renderCell={n => (
+              <>
+                <IntensityBars value={n} size="sm" />
+                <span style={{ fontSize: 11, lineHeight: 1 }}>{n}</span>
+              </>
+            )}
+          />
+        </div>
+
+        {/* Score */}
+        <div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
+            <span className="mo-eyebrow">Score</span>
+            <span style={{ fontSize: 10, color: 'var(--mo-text-3)', fontFamily: 'var(--mo-font-mono)' }}>⇧1–5</span>
+          </div>
+          <StepperGrid
+            value={score}
+            onChange={setScore}
+            renderCell={n => (
+              <>
+                <ScorePips value={n} size="sm" />
+                <span style={{ fontSize: 11, lineHeight: 1 }}>{n}</span>
+              </>
+            )}
+          />
+        </div>
       </div>
+
+      {/* Notes — only in edit mode, after the scoring section */}
+      {isEdit && (
+        <div>
+          <FieldLabel>Notes</FieldLabel>
+          <textarea
+            value={notes}
+            onChange={e => setNotes(e.target.value)}
+            rows={2}
+            placeholder="Optional notes…"
+            style={{
+              width: '100%',
+              padding: '8px 12px',
+              borderRadius: 10,
+              background: 'var(--mo-bg-elev)',
+              border: 'none',
+              outline: 'none',
+              boxShadow: 'inset 0 0 0 1px var(--mo-hairline-strong)',
+              fontSize: 13.5,
+              color: 'var(--mo-text-1)',
+              resize: 'none',
+              fontFamily: 'var(--mo-font-text)',
+              boxSizing: 'border-box' as const,
+            }}
+          />
+        </div>
+      )}
 
       {/* Footer */}
       {isEdit && (
@@ -649,6 +667,133 @@ export function InlineEditRow({ track, genreOptions, userEmail, onClose, onToast
           >
             Delete track
           </button>
+        </div>
+      )}
+
+      {/* Delete confirmation modal */}
+      {showDeleteConfirm && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 500,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          {/* Backdrop */}
+          <div
+            onClick={() => setShowDeleteConfirm(false)}
+            style={{
+              position: 'absolute',
+              inset: 0,
+              background: 'rgba(10, 11, 14, 0.5)',
+              backdropFilter: 'blur(6px)',
+              WebkitBackdropFilter: 'blur(6px)',
+            }}
+          />
+
+          {/* Modal card */}
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="delete-modal-title"
+            style={{
+              position: 'relative',
+              zIndex: 1,
+              background: 'var(--mo-bg-elev)',
+              borderRadius: 20,
+              padding: '28px 28px 24px',
+              boxShadow: 'var(--mo-shadow-3), inset 0 0 0 1px var(--mo-hairline)',
+              maxWidth: 360,
+              width: 'calc(100% - 48px)',
+              animation: 'mo-modal-in 0.22s cubic-bezier(.2,.8,.4,1)',
+            }}
+          >
+            {/* Icon */}
+            <div
+              style={{
+                width: 48,
+                height: 48,
+                borderRadius: 14,
+                background: 'rgba(215,38,61,.10)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                marginBottom: 18,
+              }}
+            >
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--mo-danger)" strokeWidth="1.8">
+                <polyline points="3 6 5 6 21 6" />
+                <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+                <path d="M10 11v6M14 11v6" />
+                <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
+              </svg>
+            </div>
+
+            <h3
+              id="delete-modal-title"
+              style={{
+                fontSize: 17,
+                fontWeight: 700,
+                color: 'var(--mo-text-1)',
+                letterSpacing: '-0.015em',
+                marginBottom: 8,
+              }}
+            >
+              Delete track?
+            </h3>
+
+            <p style={{ fontSize: 13.5, color: 'var(--mo-text-2)', lineHeight: 1.55, marginBottom: 24 }}>
+              {track.title ? (
+                <>
+                  <strong style={{ color: 'var(--mo-text-1)', fontWeight: 600 }}>{track.title}</strong>
+                  {' '}will be permanently removed from the shared library.
+                </>
+              ) : (
+                'This track will be permanently removed from the shared library.'
+              )}
+              {' '}This cannot be undone.
+            </p>
+
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+              <button
+                onClick={() => setShowDeleteConfirm(false)}
+                style={{
+                  height: 36,
+                  padding: '0 16px',
+                  borderRadius: 999,
+                  background: 'var(--mo-bg-sunken)',
+                  border: 'none',
+                  cursor: 'pointer',
+                  color: 'var(--mo-text-1)',
+                  fontSize: 13.5,
+                  fontWeight: 500,
+                  boxShadow: 'inset 0 0 0 1px var(--mo-hairline-strong)',
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={doDelete}
+                style={{
+                  height: 36,
+                  padding: '0 16px',
+                  borderRadius: 999,
+                  background: 'var(--mo-danger)',
+                  border: 'none',
+                  cursor: 'pointer',
+                  color: '#fff',
+                  fontSize: 13.5,
+                  fontWeight: 600,
+                  letterSpacing: '-0.01em',
+                }}
+              >
+                Delete track
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

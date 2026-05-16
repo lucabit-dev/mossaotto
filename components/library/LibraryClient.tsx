@@ -249,6 +249,8 @@ export function LibraryClient({ initialTracks, userEmail }: LibraryClientProps) 
   const [editingTrack, setEditingTrack] = useState<Partial<Track> | null>(null);
   const [toasts, setToasts] = useState<Toast[]>([]);
   const toastIdRef = useRef(0);
+  // IDs currently playing their exit animation before being pruned from state
+  const [exitingIds, setExitingIds] = useState<ReadonlySet<string>>(new Set());
 
   // Realtime subscription
   useEffect(() => {
@@ -260,7 +262,13 @@ export function LibraryClient({ initialTracks, userEmail }: LibraryClientProps) 
         } else if (payload.eventType === 'UPDATE') {
           setTracks(prev => prev.map(t => t.id === (payload.new as Track).id ? payload.new as Track : t));
         } else if (payload.eventType === 'DELETE') {
-          setTracks(prev => prev.filter(t => t.id !== (payload.old as Track).id));
+          const id = (payload.old as Track).id;
+          // Play exit animation for ~340ms before pruning from state
+          setExitingIds(prev => new Set([...prev, id]));
+          setTimeout(() => {
+            setTracks(prev => prev.filter(t => t.id !== id));
+            setExitingIds(prev => { const n = new Set(prev); n.delete(id); return n; });
+          }, 340);
         }
       })
       .subscribe();
@@ -336,7 +344,13 @@ export function LibraryClient({ initialTracks, userEmail }: LibraryClientProps) 
         color: 'var(--mo-text-1)',
       }}
     >
-      <Header userEmail={userEmail} dark={dark} onToggleDark={toggleDark} />
+      <Header
+        userEmail={userEmail}
+        dark={dark}
+        onToggleDark={toggleDark}
+        search={filters.search}
+        onSearchChange={v => setFilters(prev => ({ ...prev, search: v }))}
+      />
 
       <div
         style={{
@@ -372,22 +386,24 @@ export function LibraryClient({ initialTracks, userEmail }: LibraryClientProps) 
               total={tracks.length}
               queue={queueCount}
             />
+            {/* Stats + export toolbar */}
             <div
               style={{
                 padding: '4px 32px 4px',
                 display: 'flex',
-                justifyContent: 'space-between',
                 alignItems: 'center',
+                gap: 12,
               }}
             >
-              <span style={{ fontSize: 12.5, color: 'var(--mo-text-3)' }}>
-                <span style={{ color: 'var(--mo-text-2)', fontWeight: 600 }}>{filtered.length}</span>
-                {' '}shown ·{' '}
-                <span style={{ color: 'var(--mo-text-2)', fontWeight: 600 }}>{tracks.length}</span>
-                {' '}total ·{' '}
-                <span style={{ color: 'var(--mo-text-2)', fontWeight: 600 }}>{queueCount}</span>
-                {' '}in queue
+              <span style={{ fontSize: 12.5, color: 'var(--mo-text-3)', fontWeight: 500 }}>
+                <span style={{ color: 'var(--mo-text-1)', fontWeight: 600 }}>{filtered.length}</span>
+                {' '}shown
+                <span style={{ color: 'var(--mo-text-4, var(--mo-text-3))' }}> · </span>
+                {tracks.length} total
+                <span style={{ color: 'var(--mo-text-4, var(--mo-text-3))' }}> · </span>
+                <span style={{ color: 'var(--mo-accent)' }}>{queueCount} in queue</span>
               </span>
+              <div style={{ flex: 1 }} />
               <ExportButtons filtered={filtered} onToast={showToast} />
             </div>
           </>
@@ -403,12 +419,21 @@ export function LibraryClient({ initialTracks, userEmail }: LibraryClientProps) 
             <>
               <TrackRowHeaders />
               {filtered.map(track => (
-                <TrackRow
+                <div
                   key={track.id}
-                  track={track}
-                  onClick={() => setEditingTrack(track)}
-                  onToast={showToast}
-                />
+                  style={{
+                    overflow: 'hidden',
+                    animation: exitingIds.has(track.id)
+                      ? 'mo-exit 0.32s cubic-bezier(.4,0,1,1) forwards'
+                      : undefined,
+                  }}
+                >
+                  <TrackRow
+                    track={track}
+                    onClick={() => setEditingTrack(track)}
+                    onToast={showToast}
+                  />
+                </div>
               ))}
             </>
           )}

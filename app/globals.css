@@ -15,6 +15,7 @@
   --mo-accent: #4F46E5;
   --mo-accent-press: #4338CA;
   --mo-accent-tint: rgba(79, 70, 229, 0.10);
+  --mo-accent-tint-strong: rgba(79, 70, 229, 0.18);
   --mo-accent-ring: rgba(79, 70, 229, 0.35);
 
   /* Source colors */
@@ -26,6 +27,7 @@
   /* Light semantic */
   --mo-bg: #FAFAF7;
   --mo-bg-elev: #FFFFFF;
+  --mo-bg-elev-2: #F5F5F2;
   --mo-bg-sunken: #F2F1ED;
   --mo-bg-hover: rgba(0, 0, 0, 0.035);
   --mo-bg-vibrancy: rgba(250, 250, 247, 0.72);
@@ -44,8 +46,9 @@
 }
 
 [data-theme="dark"] {
-  --mo-bg: #0E0F12;
-  --mo-bg-elev: #17181C;
+  --mo-bg: #0E0F13;
+  --mo-bg-elev: #16171C;
+  --mo-bg-elev-2: #1C1E24;
   --mo-bg-sunken: #0A0B0E;
   --mo-bg-hover: rgba(255, 255, 255, 0.04);
   --mo-bg-vibrancy: rgba(14, 15, 18, 0.72);
@@ -54,10 +57,11 @@
   --mo-text-3: #6E7079;
   --mo-hairline: rgba(255, 255, 255, 0.07);
   --mo-hairline-strong: rgba(255, 255, 255, 0.14);
-  --mo-accent: #6D63F6;
-  --mo-accent-press: #5347E0;
-  --mo-accent-tint: rgba(109, 99, 246, 0.16);
-  --mo-accent-ring: rgba(109, 99, 246, 0.45);
+  --mo-accent: #8B7CF7;
+  --mo-accent-press: #7060E8;
+  --mo-accent-tint: rgba(139, 124, 247, 0.14);
+  --mo-accent-tint-strong: rgba(139, 124, 247, 0.22);
+  --mo-accent-ring: rgba(139, 124, 247, 0.45);
   --mo-success: #2BB073;
   --mo-shadow-1: 0 1px 0 rgba(0, 0, 0, .40), 0 1px 2px rgba(0, 0, 0, .40);
   --mo-shadow-2: 0 1px 0 rgba(0, 0, 0, .40), 0 10px 24px rgba(0, 0, 0, .50);
@@ -99,4 +103,30 @@ body {
 
 [data-theme="dark"] * {
   scrollbar-color: rgba(255, 255, 255, 0.10) transparent;
+}
+
+@keyframes mo-enter {
+  from { opacity: 0; transform: translateY(-10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes mo-exit {
+  0%   { opacity: 1; max-height: 80px; transform: translateX(0); }
+  100% { opacity: 0; max-height: 0;    transform: translateX(-8px); }
+}
+
+@keyframes mo-pop {
+  0%   { transform: scale(0); opacity: 0; }
+  55%  { transform: scale(1.35); }
+  100% { transform: scale(1);   opacity: 1; }
+}
+
+@keyframes mo-modal-in {
+  from { opacity: 0; transform: scale(0.95) translateY(8px); }
+  to   { opacity: 1; transform: scale(1)    translateY(0); }
+}
+
+@keyframes mo-spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
 }

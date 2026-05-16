@@ -61,11 +61,10 @@ When you paste a URL and the dialog opens, MOSSA OTTO automatically looks up BPM
 **How the lookup cascade works:**
 
 1. **Deezer** (free, no key required) — covers most mainstream electronic releases. Returns BPM only.
-2. **GetSongBPM** (optional, requires API key) — fills gaps when Deezer has no BPM. Also returns musical key. **Deploy first**, then request a key at [getsongbpm.com/api](https://getsongbpm.com/api): use your live URL (e.g. `https://mossaotto.vercel.app`) as Website URL and Backlink URL — the app footer links to GetSongBPM (required). Add the key as `GETSONGBPM_API_KEY`.
+2. **GetSongBPM** (optional, requires API key) — fills gaps when Deezer has no BPM. Also returns musical key. Get a free key at [getsongbpm.com/api](https://getsongbpm.com/api) and add it as `GETSONGBPM_API_KEY` (their signup may require a backlink on your site per their terms).
 3. **Manual** — white labels, edits, and unreleased tracks that neither service recognises stay manual. The BPM and key fields remain blank and you can type directly.
 
 **"Refresh BPM/Key" button** — available in both the edit dialog (next to the BPM label) and on each row (appears on hover). Use it to retroactively fill in tracks saved without BPM, or after correcting a misspelled artist name.
 
 **Vercel deployment:** Add `GETSONGBPM_API_KEY` in your project's **Environment Variables** (Production + Preview) if you want the GetSongBPM fallback. The app works fine without it — Deezer alone covers most tracks.
 
-> **Attribution:** The app footer includes the required [GetSongBPM](https://getsongbpm.com) backlink on every page. Their signup checker crawls your live site — if you see "Backlink is missing", deploy the latest code and wait a minute before resubmitting.
