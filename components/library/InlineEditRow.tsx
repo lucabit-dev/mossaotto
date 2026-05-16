@@ -60,6 +60,8 @@ interface InlineEditRowProps {
   userEmail: string | null;
   onClose: () => void;
   onToast: (msg: string, type?: 'ok' | 'err') => void;
+  onSaved: (track: Track) => void;
+  onDeleted?: (id: string) => void;
   isMobile?: boolean;
 }
 
@@ -150,7 +152,7 @@ function SoftInput({
   );
 }
 
-export function InlineEditRow({ track, genreOptions, userEmail, onClose, onToast, isMobile = false }: InlineEditRowProps) {
+export function InlineEditRow({ track, genreOptions, userEmail, onClose, onToast, onSaved, onDeleted, isMobile = false }: InlineEditRowProps) {
   const supabase = createClient();
   const isEdit = !!track.id;
   const titleRef = useRef<HTMLInputElement | null>(null);
@@ -251,15 +253,16 @@ export function InlineEditRow({ track, genreOptions, userEmail, onClose, onToast
       downloaded: track.downloaded ?? false,
     };
 
-    const { error } = isEdit
-      ? await supabase.from('tracks').update(payload).eq('id', track.id!)
-      : await supabase.from('tracks').insert(payload);
+    const { data, error } = isEdit
+      ? await supabase.from('tracks').update(payload).eq('id', track.id!).select().single()
+      : await supabase.from('tracks').insert(payload).select().single();
 
     setSaving(false);
     if (error) {
       if (error.code === '23505') onToast('URL already in library', 'err');
       else onToast(error.message, 'err');
     } else {
+      onSaved(data as Track);
       onToast(isEdit ? 'Track updated' : 'Track saved', 'ok');
       onClose();
     }
@@ -275,7 +278,11 @@ export function InlineEditRow({ track, genreOptions, userEmail, onClose, onToast
     setShowDeleteConfirm(false);
     const { error } = await supabase.from('tracks').delete().eq('id', track.id);
     if (error) onToast(error.message, 'err');
-    else { onToast('Track deleted'); onClose(); }
+    else {
+      onDeleted?.(track.id);
+      onToast('Track deleted');
+      onClose();
+    }
   }
 
   async function handleRefreshBpm() {
@@ -559,14 +566,6 @@ export function InlineEditRow({ track, genreOptions, userEmail, onClose, onToast
                   })}
                 </div>
               </div>
-              {/* Notes — edit only */}
-              {isEdit && (
-                <div>
-                  <FieldLabel>Notes</FieldLabel>
-                  <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={2} placeholder="Optional notes…"
-                    style={{ width: '100%', padding: '8px 12px', borderRadius: 10, background: 'var(--mo-bg-elev)', border: 'none', outline: 'none', boxShadow: 'inset 0 0 0 1px var(--mo-hairline-strong)', fontSize: 13.5, color: 'var(--mo-text-1)', resize: 'none', fontFamily: 'var(--mo-font-text)', boxSizing: 'border-box' as const }} />
-                </div>
-              )}
               {isEdit && (
                 <button onClick={handleDelete} style={{ height: 40, borderRadius: 10, background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--mo-danger)', fontSize: 14, fontWeight: 500, textAlign: 'left' as const }}>
                   Delete track
@@ -910,33 +909,6 @@ export function InlineEditRow({ track, genreOptions, userEmail, onClose, onToast
             />
           </div>
         </div>
-
-        {/* Notes — only in edit mode */}
-        {isEdit && (
-          <div>
-            <FieldLabel>Notes</FieldLabel>
-            <textarea
-              value={notes}
-              onChange={e => setNotes(e.target.value)}
-              rows={2}
-              placeholder="Optional notes…"
-              style={{
-                width: '100%',
-                padding: '8px 12px',
-                borderRadius: 10,
-                background: 'var(--mo-bg-elev)',
-                border: 'none',
-                outline: 'none',
-                boxShadow: 'inset 0 0 0 1px var(--mo-hairline-strong)',
-                fontSize: 13.5,
-                color: 'var(--mo-text-1)',
-                resize: 'none',
-                fontFamily: 'var(--mo-font-text)',
-                boxSizing: 'border-box' as const,
-              }}
-            />
-          </div>
-        )}
 
         {/* Footer */}
         {isEdit && (

@@ -60,7 +60,7 @@ export function TrackRowHeaders() {
   );
 }
 
-export function TrackRow({ track, onClick, selected, onSelect }: TrackRowProps) {
+export function TrackRow({ track, onClick: onEdit, selected, onSelect }: TrackRowProps) {
   const [hovered, setHovered] = useState(false);
   const [justArrived, setJustArrived] = useState(false);
 
@@ -101,7 +101,7 @@ export function TrackRow({ track, onClick, selected, onSelect }: TrackRowProps) 
 
   return (
     <div
-      onClick={onClick}
+      onClick={() => window.open(track.url, '_blank', 'noopener,noreferrer')}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       style={{
@@ -342,7 +342,7 @@ export function TrackRow({ track, onClick, selected, onSelect }: TrackRowProps) 
       {/* Col 8: Edit button */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <button
-          onClick={e => { e.stopPropagation(); onClick(); }}
+          onClick={e => { e.stopPropagation(); onEdit(); }}
           style={{
             width: 28,
             height: 28,

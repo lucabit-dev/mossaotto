@@ -234,11 +234,11 @@ export function LibraryClient({ initialTracks, userEmail }: LibraryClientProps) 
   const supabase = createClient();
   const router = useRouter();
 
-  // Dark mode — stored in localStorage
-  const [dark, setDark] = useState(false);
+  // Dark mode — default on; localStorage mo-dark=false opts into light
+  const [dark, setDark] = useState(true);
   useEffect(() => {
     const stored = localStorage.getItem('mo-dark');
-    if (stored === 'true') setDark(true);
+    setDark(stored !== 'false');
   }, []);
 
   // Sync to <html data-theme> so body and global styles switch correctly
@@ -362,6 +362,11 @@ export function LibraryClient({ initialTracks, userEmail }: LibraryClientProps) 
 
   const queueCount = useMemo(() => tracks.filter(t => !t.downloaded).length, [tracks]);
 
+  const allSelectedDownloaded = useMemo(
+    () => selectedIds.size > 0 && [...selectedIds].every(id => tracks.find(t => t.id === id)?.downloaded),
+    [selectedIds, tracks]
+  );
+
   async function handleMarkDownloaded(value: boolean) {
     const ids = [...selectedIds];
     setTracks(prev => prev.map(t => ids.includes(t.id) ? { ...t, downloaded: value } : t));
@@ -370,7 +375,7 @@ export function LibraryClient({ initialTracks, userEmail }: LibraryClientProps) 
       setTracks(prev => prev.map(t => ids.includes(t.id) ? { ...t, downloaded: !value } : t));
       showToast(error.message, 'err');
     } else {
-      showToast(`${ids.length} tracks ${value ? 'marked downloaded' : 'moved to queue'}`, 'ok');
+      showToast(`${ids.length} tracks ${value ? 'marked downloaded' : 'unmarked'}`, 'ok');
       clearSelection();
     }
   }
@@ -389,6 +394,26 @@ export function LibraryClient({ initialTracks, userEmail }: LibraryClientProps) 
         showToast(`${ids.length} tracks deleted`, 'ok');
         clearSelection();
       }
+    }, 340);
+  }
+
+  function handleTrackSaved(saved: Track) {
+    setTracks(prev => {
+      const idx = prev.findIndex(t => t.id === saved.id);
+      if (idx >= 0) {
+        const next = [...prev];
+        next[idx] = saved;
+        return next;
+      }
+      return [saved, ...prev];
+    });
+  }
+
+  function handleTrackDeleted(id: string) {
+    setExitingIds(prev => new Set([...prev, id]));
+    setTimeout(() => {
+      setTracks(prev => prev.filter(t => t.id !== id));
+      setExitingIds(prev => { const n = new Set(prev); n.delete(id); return n; });
     }, 340);
   }
 
@@ -488,6 +513,8 @@ export function LibraryClient({ initialTracks, userEmail }: LibraryClientProps) 
             track={editingTrack}
             onClose={() => setEditingTrack(null)}
             onToast={showToast}
+            onSaved={handleTrackSaved}
+            onDeleted={handleTrackDeleted}
             genreOptions={genreOptions}
             userEmail={userEmail}
             isMobile={isMobile}
@@ -579,8 +606,7 @@ export function LibraryClient({ initialTracks, userEmail }: LibraryClientProps) 
                   {selectedIds.size} selected
                 </span>
                 <div style={{ width: 1, height: 14, background: 'var(--mo-accent-ring)' }} />
-                <button onClick={() => handleMarkDownloaded(true)} style={{ ...toolbarBtnStyle, color: 'var(--mo-text-1)' }}>Mark downloaded</button>
-                <button onClick={() => handleMarkDownloaded(false)} style={{ ...toolbarBtnStyle, color: 'var(--mo-text-1)' }}>Mark as queue</button>
+                <button onClick={() => handleMarkDownloaded(!allSelectedDownloaded)} style={{ ...toolbarBtnStyle, color: 'var(--mo-text-1)' }}>{allSelectedDownloaded ? 'Unmark downloaded' : 'Mark downloaded'}</button>
                 <button onClick={handleDeleteSelected} style={{ ...toolbarBtnStyle, color: 'var(--mo-danger)' }}>Remove</button>
                 <div style={{ flex: 1 }} />
                 <button onClick={clearSelection} style={{ ...toolbarBtnStyle, color: 'var(--mo-accent)' }}>Clear</button>
@@ -630,7 +656,7 @@ export function LibraryClient({ initialTracks, userEmail }: LibraryClientProps) 
                   return (
                     <div
                       key={track.id}
-                      onClick={() => setEditingTrack(track)}
+                      onClick={() => window.open(track.url, '_blank', 'noopener,noreferrer')}
                       style={{
                         background: 'var(--mo-bg-elev)',
                         borderRadius: 14,
@@ -689,6 +715,23 @@ export function LibraryClient({ initialTracks, userEmail }: LibraryClientProps) 
                             {track.score && <ScorePips value={track.score} size="sm" />}
                           </div>
                         </div>
+                        {/* Three dots — edit */}
+                        <button
+                          onClick={e => { e.stopPropagation(); setEditingTrack(track); }}
+                          style={{
+                            width: 32, height: 32, borderRadius: 8, background: 'transparent',
+                            border: 'none', cursor: 'pointer', flexShrink: 0,
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            color: 'var(--mo-text-3)',
+                          }}
+                          title="Edit track"
+                        >
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                            <circle cx="5" cy="12" r="1.5" />
+                            <circle cx="12" cy="12" r="1.5" />
+                            <circle cx="19" cy="12" r="1.5" />
+                          </svg>
+                        </button>
                       </div>
                     </div>
                   );
