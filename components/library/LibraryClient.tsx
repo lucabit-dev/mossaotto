@@ -536,7 +536,6 @@ export function LibraryClient({ initialTracks, userEmail }: LibraryClientProps) 
                 <div style={{ display: 'inline-flex', padding: 3, borderRadius: 999, background: 'var(--mo-bg-sunken)', boxShadow: 'inset 0 0 0 1px var(--mo-hairline)', flex: 1 }}>
                   {[
                     { value: 'all' as const, label: 'All' },
-                    { value: 'queue' as const, label: 'Queue' },
                     { value: 'downloaded' as const, label: 'DL' },
                   ].map(opt => {
                     const active = filters.status === opt.value;
