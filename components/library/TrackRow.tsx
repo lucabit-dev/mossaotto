@@ -93,8 +93,6 @@ export function TrackRow({ track, onClick, onToast }: TrackRowProps) {
     if (error) {
       setDownloaded(!next); // revert
       onToast(error.message, 'err');
-    } else {
-      onToast(next ? 'Marked as downloaded' : 'Marked as not downloaded', 'ok');
     }
   }
 
