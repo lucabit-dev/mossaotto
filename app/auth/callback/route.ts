@@ -10,7 +10,13 @@ export async function GET(request: NextRequest) {
     const supabase = await createClient();
     const { error } = await supabase.auth.exchangeCodeForSession(code);
     if (!error) {
-      return NextResponse.redirect(`${origin}${next}`);
+      // On Vercel, request.url is the internal host; x-forwarded-host is the public domain.
+      const forwardedHost = request.headers.get('x-forwarded-host');
+      const redirectBase =
+        forwardedHost && process.env.NODE_ENV === 'production'
+          ? `https://${forwardedHost}`
+          : origin;
+      return NextResponse.redirect(`${redirectBase}${next}`);
     }
   }
 

@@ -8,22 +8,43 @@ export async function GET(request: NextRequest) {
   const source = detectSource(url);
   const oembedUrl = getOEmbedUrl(url, source);
 
-  if (!oembedUrl) {
-    return NextResponse.json({ source, title: null, artist: null, artwork_url: null }, { status: 200 });
-  }
+  // Run oEmbed and Odesli in parallel — Odesli fills artist for Spotify which oEmbed omits
+  const [oembedSettled, odesliSettled] = await Promise.allSettled([
+    oembedUrl
+      ? fetch(oembedUrl, { headers: { 'User-Agent': 'MossaOtto/1.0' }, next: { revalidate: 3600 } })
+          .then(r => (r.ok ? r.json() : null))
+          .then((data: Record<string, unknown> | null) =>
+            data ? parseOEmbedResult(data, source) : null
+          )
+      : Promise.resolve(null),
+    fetch(`https://api.song.link/v1-alpha.1/links?url=${encodeURIComponent(url)}`, {
+      next: { revalidate: 3600 },
+    })
+      .then(r => (r.ok ? r.json() : null))
+      .then((data: Record<string, unknown> | null) => {
+        if (!data) return null;
+        const entities = Object.values(
+          (data.entitiesByUniqueId as Record<string, unknown>) ?? {}
+        ) as Record<string, unknown>[];
+        const e = entities.find(x => x?.title && x?.artistName) ?? entities[0];
+        return e
+          ? {
+              title: (e.title as string) ?? null,
+              artist: (e.artistName as string) ?? null,
+              artwork: (e.thumbnailUrl as string) ?? null,
+            }
+          : null;
+      }),
+  ]);
 
-  try {
-    const res = await fetch(oembedUrl, { headers: { 'User-Agent': 'MossaOtto/1.0' }, next: { revalidate: 3600 } });
-    if (!res.ok) throw new Error(`oEmbed returned ${res.status}`);
-    const data = await res.json();
-    const parsed = parseOEmbedResult(data as Record<string, unknown>, source);
-    return NextResponse.json({
-      source,
-      title: parsed.title ?? null,
-      artist: parsed.artist ?? null,
-      artwork_url: parsed.thumbnail_url ?? null,
-    });
-  } catch (e) {
-    return NextResponse.json({ source, title: null, artist: null, artwork_url: null, error: String(e) }, { status: 200 });
-  }
+  const oembed = oembedSettled.status === 'fulfilled' ? oembedSettled.value : null;
+  const odesli = odesliSettled.status === 'fulfilled' ? odesliSettled.value : null;
+
+  // Odesli wins on artist/title; oEmbed thumbnail is usually higher-res
+  return NextResponse.json({
+    source,
+    title: odesli?.title ?? oembed?.title ?? null,
+    artist: odesli?.artist ?? oembed?.artist ?? null,
+    artwork_url: oembed?.thumbnail_url ?? (odesli as { artwork?: string } | null)?.artwork ?? null,
+  });
 }

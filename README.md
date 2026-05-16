@@ -53,3 +53,19 @@ Open http://localhost:3000. You'll be redirected to `/auth/login` — enter your
 | Realtime not updating | Re-run the `alter publication supabase_realtime add table tracks` line from `schema.sql` in the SQL Editor |
 | Auth callback fails in production | Confirm the production URL is added to Redirect URLs in Supabase Auth settings |
 | 403 errors on DB operations | RLS policies require an authenticated session — make sure you're signed in |
+
+## BPM and key auto-fetch
+
+When you paste a URL and the dialog opens, MOSSA OTTO automatically looks up BPM (and key when available) in the background — you don't need to do anything.
+
+**How the lookup cascade works:**
+
+1. **Deezer** (free, no key required) — covers most mainstream electronic releases. Returns BPM only.
+2. **GetSongBPM** (optional, requires API key) — fills gaps when Deezer has no BPM. Also returns musical key. Get a free key at [getsongbpm.com/api](https://getsongbpm.com/api) and add it to your environment variables as `GETSONGBPM_API_KEY`.
+3. **Manual** — white labels, edits, and unreleased tracks that neither service recognises stay manual. The BPM and key fields remain blank and you can type directly.
+
+**"Refresh BPM/Key" button** — available in both the edit dialog (next to the BPM label) and on each row (appears on hover). Use it to retroactively fill in tracks saved without BPM, or after correcting a misspelled artist name.
+
+**Vercel deployment:** Add `GETSONGBPM_API_KEY` in your project's **Environment Variables** (Production + Preview) if you want the GetSongBPM fallback. The app works fine without it — Deezer alone covers most tracks.
+
+> **Attribution:** If `GETSONGBPM_API_KEY` is configured, their license requires a credit line. Add "BPM data via [GetSongBPM](https://getsongbpm.com)" somewhere visible in the app (footer or about section).
